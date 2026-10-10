@@ -1,6 +1,7 @@
 package com.isuncy.ilife798.data.remote
 
 import com.isuncy.ilife798.core.Constants
+import com.isuncy.ilife798.core.TimeUtil
 import com.isuncy.ilife798.data.model.MissionItem
 import com.isuncy.ilife798.data.model.MissionsResult
 import kotlinx.serialization.json.*
@@ -42,6 +43,7 @@ object Parsers {
     /**
      * 解析 mission-lst → MissionsResult，与 Python process_single_account 的取值一致。
      * data 缺失时返回全零结果（Python 中 inner={} 仍会继续执行并做最终结算）。
+     * 顶层 time 字段（服务端时间）用于 score-send 的签名校正。
      */
     fun parseMissions(json: JsonObject): MissionsResult {
         val data = json["data"] as? JsonObject ?: JsonObject(emptyMap())
@@ -67,7 +69,8 @@ object Parsers {
             dailyWeek = daily["week"] as? JsonPrimitive,
             dailyAdId = dailyRsp?.get("adId")?.primitiveStringOrNull(),
             dailyScore = dailyRsp?.get("score").asInt(Constants.DEFAULT_CHECKIN_SCORE),
-            missions = missions
+            missions = missions,
+            serverTimeMs = TimeUtil.normalizeServerTs(json["time"].asLong(0L))
         )
     }
 

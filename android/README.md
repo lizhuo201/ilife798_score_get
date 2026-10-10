@@ -30,7 +30,7 @@ cd android
 
 ## 测试
 
-`./gradlew test`：签名向量（与 Python get_sign 一致的固定向量）、任务过滤/限次/类型、mission-lst 与流水解析。
+`./gradlew test`：签名固定向量（含服务端时间校正）、时间工具、任务过滤/限次/类型/签到判重、mission-lst 与流水解析。
 
 ## 数据与安全
 
@@ -39,5 +39,16 @@ cd android
 
 ## 协议对齐说明
 
-请求头、get_sign、登录两步流程、mission-lst/score-lst/score-send 的字段解析与成功判定
-（code/status 为 0、200、None）均按 `auto_score.py` 1:1 移植。
+请求头、登录两步流程、mission-lst/score-lst/score-send 的字段解析与成功判定
+（code/status 为 0、200、None）均按 `auto_score.py` 移植。
+
+积分上报的签名与请求体已对齐 2026-10 之后的线上版本（旧脚本的算法会被服务端判为
+`code=-1 msg=验签失败`，仓库里的 `auto_score.py` 本身也已失效）：
+
+- 签名：`v20 = 10 * ((serverTs - localTs + nowMs) / 10000)`，
+  `sign = md5(adId + v20 + token[-8:] + uid[-8:] + SALT)`；`localTs` 取请求 mission-lst 前的本机毫秒，
+  `serverTs` 取该响应顶层 `time` 字段（毫秒）；偏差超过 30 分钟时忽略校正。
+- 上报：`POST /api/v1/acc/score/score-send?sign=...&s=1`（官方 App 通道）。
+- 请求体：普通任务 `{"adId":...,"type":101}`；每日签到 `{"adId":...,"weekDay":1..7}`（北京时间的 ISO 星期）。
+  旧脚本携带的 `addScore`/`addScoreType`/小写 `weekday` 会被服务端视为无效请求。
+- 每日签到判重：`daily.ltime` 同日、今日流水计数、`daily.week` 位图（bit0 = 周一）任一成立即视为已签到。

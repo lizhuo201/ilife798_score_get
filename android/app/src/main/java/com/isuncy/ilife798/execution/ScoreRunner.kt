@@ -60,12 +60,20 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
         val todayZero = TimeUtil.startOfTodayMs(nowMs)
 
         // 1. mission-lst（HTTP 200 由 ApiClient.getJsonStrict 保证）
+        //    localTs 为本次请求前的本机时间，与服务端返回的 time 字段求偏差用于签名校正
+        val localTs = System.currentTimeMillis()
         val parsed: MissionsResult = IlifApi.getMissions(account.token)
             ?.let { Parsers.parseMissions(it) }
             ?: run {
                 onLog("获取任务列表失败，跳过该账号")
                 return AccountResult(account.phone, 0, 0, 0, 0)
             }
+        val serverTs = parsed.serverTimeMs
+        if (serverTs > 0L) {
+            val skew = serverTs - localTs
+            onLog("服务端时间偏差 " + skew + " ms" +
+                if (skew <= Signer.MAX_SKEW_MS && skew >= -Signer.MAX_SKEW_MS) "（签名已按服务端时间校正）" else "（超出阈值，忽略校正）")
+        }
         val beforeScore = parsed.score
 
         // 2. 今日流水统计
@@ -82,8 +90,12 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
         for (task in queue) {
             onLog("- 任务[" + task.name + "] 执行 " + task.runsNeeded + " 次（进度 " + task.progress + "）")
             for (runIndex in 1..task.runsNeeded) {
-                val sign = Signer.signNow(task.refId, account.token, account.uid)
-                val body = MissionLogic.buildSendBody(task)
+                // 每次上报都取当前时间重新签名（服务端按 10 秒一桶校验）
+                val sendMs = System.currentTimeMillis()
+                val sign = Signer.signWithServerTime(
+                    task.refId, account.token, account.uid, sendMs, localTs, serverTs
+                )
+                val body = MissionLogic.buildSendBody(task, sendMs)
                 val result = IlifApi.sendScore(account.token, sign, body)
 
                 val ok: Boolean

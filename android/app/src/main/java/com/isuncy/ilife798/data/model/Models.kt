@@ -28,18 +28,21 @@ data class MissionsResult(
     val dailyWeek: JsonPrimitive?,
     val dailyAdId: String?,
     val dailyScore: Int,
-    val missions: List<MissionItem>
+    val missions: List<MissionItem>,
+    /** 响应体顶层 time 字段（毫秒），用于签名时间校正；缺失为 0。 */
+    val serverTimeMs: Long = 0L
 )
 
-/** 待执行任务（与 Python 版 tasks 列表结构一致）。 */
+/** 待执行任务。 */
 data class TaskPlan(
     val name: String,
     val refId: String,
     val score: Int,
     val type: Int,
-    val weekday: JsonPrimitive?,
     val runsNeeded: Int,
-    val progress: String
+    val progress: String,
+    /** true 表示每日签到：上报体使用 weekDay（1..7）而非 type。 */
+    val isCheckIn: Boolean = false
 )
 
 /** score-send 的响应判定结果。 */

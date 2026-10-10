@@ -97,6 +97,14 @@ class ParsingTest {
         assertEquals(0, r2.totalScore)
     }
 
+    @Test
+    fun parseMissionsReadsServerTime() {
+        assertEquals(1760140001500L, Parsers.parseMissions(json("{\"time\":1760140001500,\"data\":{}}")).serverTimeMs)
+        assertEquals(1760140000000L, Parsers.parseMissions(json("{\"time\":1760140000}")).serverTimeMs)
+        assertEquals(0L, Parsers.parseMissions(json("{}")).serverTimeMs)
+        assertEquals(0L, Parsers.parseMissions(json("{\"time\":null,\"data\":{}}")).serverTimeMs)
+    }
+
     // ---- parseTodayCounts ----
 
     @Test

@@ -1,6 +1,7 @@
 package com.isuncy.ilife798
 
 import com.isuncy.ilife798.core.MissionLogic
+import com.isuncy.ilife798.core.TimeUtil
 import com.isuncy.ilife798.data.model.MissionItem
 import com.isuncy.ilife798.data.model.MissionsResult
 import com.isuncy.ilife798.data.model.TaskPlan
@@ -12,7 +13,9 @@ import org.junit.Test
 
 class MissionLogicTest {
 
+    // 2025-01-09 16:45 北京时间 → 周四（ISO 4），当日位图 = 1 shl 3 = 8
     private val nowMs = 1736412345678L
+    private val todayBit = 1 shl (TimeUtil.isoWeekdayInBeijing(nowMs) - 1)
 
     private fun result(
         dailyAdId: String? = "DAILY_CHECK_IN",
@@ -32,6 +35,15 @@ class MissionLogicTest {
 
     private fun item(name: String, refId: String, score: Int, limit: Int, hasUrl: Boolean = false) =
         MissionItem(name, refId, score, limit, hasUrl)
+
+    private fun plan(
+        refId: String = "r",
+        type: Int = 2,
+        score: Int = 5,
+        runsNeeded: Int = 1,
+        progress: String = "0/1",
+        isCheckIn: Boolean = false
+    ) = TaskPlan("n", refId, score, type, runsNeeded, progress, isCheckIn)
 
     // ---- 过滤规则 ----
 
@@ -158,31 +170,13 @@ class MissionLogicTest {
         assertEquals(1, task.type)
         assertEquals(1, task.runsNeeded)
         assertEquals(5, task.score)
+        assertTrue(task.isCheckIn)
     }
 
     @Test
     fun checkinUsesDailyScore() {
         val q = MissionLogic.buildTaskQueue(result(dailyScore = 8), emptyMap(), nowMs)
         assertEquals(8, q.first { it.refId == "DAILY_CHECK_IN" }.score)
-    }
-
-    @Test
-    fun checkinWeekdayPassedThrough() {
-        val week = JsonPrimitive("3")
-        val q = MissionLogic.buildTaskQueue(result(dailyWeek = week), emptyMap(), nowMs)
-        assertEquals(week, q.first { it.refId == "DAILY_CHECK_IN" }.weekday)
-    }
-
-    @Test
-    fun checkinSkippedWhenNoDailyAdId() {
-        val q = MissionLogic.buildTaskQueue(result(dailyAdId = null), emptyMap(), nowMs)
-        assertTrue(q.none { it.refId == "DAILY_CHECK_IN" })
-    }
-
-    @Test
-    fun checkinSkippedWhenEmptyDailyAdId() {
-        val q = MissionLogic.buildTaskQueue(result(dailyAdId = ""), emptyMap(), nowMs)
-        assertTrue(q.none { it.refId == "DAILY_CHECK_IN" })
     }
 
     @Test
@@ -206,23 +200,64 @@ class MissionLogicTest {
         assertEquals(1, q.count { it.refId == "DAILY_CHECK_IN" })
     }
 
-    // ---- buildSendBody ----
-
     @Test
-    fun sendBodyOmitsNullWeekday() {
-        val task = TaskPlan("n", "r", 5, 2, null, 1, "0/1")
-        val body = MissionLogic.buildSendBody(task)
-        assertEquals("r", body["adId"]?.toString()?.trim('"'))
-        assertEquals("101", (body["type"] as JsonPrimitive).content)
-        assertEquals("2", (body["addScoreType"] as JsonPrimitive).content)
-        assertEquals("5", (body["addScore"] as JsonPrimitive).content)
-        assertFalse(body.containsKey("weekday"))
+    fun checkinSkippedWhenWeekMaskHasTodayBit() {
+        val q = MissionLogic.buildTaskQueue(
+            result(dailyWeek = JsonPrimitive(todayBit)), emptyMap(), nowMs
+        )
+        assertTrue(q.none { it.refId == "DAILY_CHECK_IN" })
     }
 
     @Test
-    fun sendBodyIncludesWeekdayWhenPresent() {
-        val task = TaskPlan("n", "r", 5, 1, JsonPrimitive("3"), 1, "0/1")
-        val body = MissionLogic.buildSendBody(task)
-        assertEquals("3", body["weekday"]?.toString()?.trim('"'))
+    fun checkinQueuedWhenWeekMaskBitIsAnotherDay() {
+        val mondayOnly = 1
+        assertTrue(todayBit != mondayOnly)
+        val q = MissionLogic.buildTaskQueue(
+            result(dailyWeek = JsonPrimitive(mondayOnly)), emptyMap(), nowMs
+        )
+        assertEquals(1, q.count { it.refId == "DAILY_CHECK_IN" })
+    }
+
+    @Test
+    fun checkinToleratesNonNumericWeekMask() {
+        val q = MissionLogic.buildTaskQueue(
+            result(dailyWeek = JsonPrimitive("abc")), emptyMap(), nowMs
+        )
+        assertEquals(1, q.count { it.refId == "DAILY_CHECK_IN" })
+    }
+
+    @Test
+    fun checkinSkippedWhenNoDailyAdId() {
+        val q = MissionLogic.buildTaskQueue(result(dailyAdId = null), emptyMap(), nowMs)
+        assertTrue(q.none { it.refId == "DAILY_CHECK_IN" })
+    }
+
+    @Test
+    fun checkinSkippedWhenEmptyDailyAdId() {
+        val q = MissionLogic.buildTaskQueue(result(dailyAdId = ""), emptyMap(), nowMs)
+        assertTrue(q.none { it.refId == "DAILY_CHECK_IN" })
+    }
+
+    // ---- buildSendBody ----
+
+    @Test
+    fun missionBodyHasOnlyAdIdAndType() {
+        val body = MissionLogic.buildSendBody(plan(refId = "read_x"), nowMs)
+        assertEquals("read_x", (body["adId"] as JsonPrimitive).content)
+        assertEquals("101", (body["type"] as JsonPrimitive).content)
+        assertFalse(body.containsKey("weekDay"))
+        assertFalse(body.containsKey("weekday"))
+        assertFalse(body.containsKey("addScoreType"))
+        assertFalse(body.containsKey("addScore"))
+    }
+
+    @Test
+    fun checkinBodyUsesWeekDayOnly() {
+        val task = plan(refId = "DAILY_CHECK_IN", type = 1, isCheckIn = true)
+        val body = MissionLogic.buildSendBody(task, nowMs)
+        assertEquals("DAILY_CHECK_IN", (body["adId"] as JsonPrimitive).content)
+        assertEquals("4", (body["weekDay"] as JsonPrimitive).content)
+        assertFalse(body.containsKey("type"))
+        assertFalse(body.containsKey("addScore"))
     }
 }
