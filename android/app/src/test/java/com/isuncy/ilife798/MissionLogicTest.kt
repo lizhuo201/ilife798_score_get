@@ -241,8 +241,8 @@ class MissionLogicTest {
     // ---- buildSendBody ----
 
     @Test
-    fun missionBodyHasOnlyAdIdAndType() {
-        val body = MissionLogic.buildSendBody(plan(refId = "read_x"), nowMs)
+    fun missionBodyIsMinimalForAppChannelVariant() {
+        val body = MissionLogic.buildSendBody(plan(refId = "read_x"), nowMs, MissionLogic.SEND_VARIANTS[0])
         assertEquals("read_x", (body["adId"] as JsonPrimitive).content)
         assertEquals("101", (body["type"] as JsonPrimitive).content)
         assertFalse(body.containsKey("weekDay"))
@@ -252,12 +252,36 @@ class MissionLogicTest {
     }
 
     @Test
-    fun checkinBodyUsesWeekDayOnly() {
+    fun missionBodyCarriesScoreForWebVariant() {
+        val task = plan(refId = "read_x", score = 12)
+        val body = MissionLogic.buildSendBody(task, nowMs, MissionLogic.SendVariant("1", true))
+        assertEquals("read_x", (body["adId"] as JsonPrimitive).content)
+        assertEquals("101", (body["type"] as JsonPrimitive).content)
+        assertEquals("1", (body["addScoreType"] as JsonPrimitive).content)
+        assertEquals("12", (body["addScore"] as JsonPrimitive).content)
+        assertFalse(body.containsKey("weekDay"))
+        assertFalse(body.containsKey("weekday"))
+    }
+
+    @Test
+    fun checkinBodyUsesWeekDayOnlyForEveryVariant() {
         val task = plan(refId = "DAILY_CHECK_IN", type = 1, isCheckIn = true)
-        val body = MissionLogic.buildSendBody(task, nowMs)
-        assertEquals("DAILY_CHECK_IN", (body["adId"] as JsonPrimitive).content)
-        assertEquals("4", (body["weekDay"] as JsonPrimitive).content)
-        assertFalse(body.containsKey("type"))
-        assertFalse(body.containsKey("addScore"))
+        for (variant in MissionLogic.SEND_VARIANTS) {
+            val body = MissionLogic.buildSendBody(task, nowMs, variant)
+            assertEquals("DAILY_CHECK_IN", (body["adId"] as JsonPrimitive).content)
+            assertEquals("4", (body["weekDay"] as JsonPrimitive).content)
+            assertFalse(body.containsKey("type"))
+            assertFalse(body.containsKey("addScore"))
+            assertFalse(body.containsKey("addScoreType"))
+        }
+    }
+
+    @Test
+    fun sendVariantsCoverBothFlagAndBodyStyles() {
+        assertEquals(4, MissionLogic.SEND_VARIANTS.size)
+        assertTrue(MissionLogic.SEND_VARIANTS.any { it.s == "1" && !it.includeScore })
+        assertTrue(MissionLogic.SEND_VARIANTS.any { it.s == "true" && !it.includeScore })
+        assertTrue(MissionLogic.SEND_VARIANTS.any { it.includeScore })
+        assertEquals("s=1 极简body", MissionLogic.SEND_VARIANTS[0].label)
     }
 }

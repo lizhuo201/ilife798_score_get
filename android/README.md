@@ -48,7 +48,12 @@ cd android
 - 签名：`v20 = 10 * ((serverTs - localTs + nowMs) / 10000)`，
   `sign = md5(adId + v20 + token[-8:] + uid[-8:] + SALT)`；`localTs` 取请求 mission-lst 前的本机毫秒，
   `serverTs` 取该响应顶层 `time` 字段（毫秒）；偏差超过 30 分钟时忽略校正。
-- 上报：`POST /api/v1/acc/score/score-send?sign=...&s=1`（官方 App 通道）。
-- 请求体：普通任务 `{"adId":...,"type":101}`；每日签到 `{"adId":...,"weekDay":1..7}`（北京时间的 ISO 星期）。
-  旧脚本携带的 `addScore`/`addScoreType`/小写 `weekday` 会被服务端视为无效请求。
+- 上报：`POST /api/v1/acc/score/score-send?sign=...&s=<s>`。第三方还原实现分成两派，
+  执行器按 `MissionLogic.SEND_VARIANTS` 顺序探测并在成功后固定沿用：
+  `s=1` + 极简 body（官方 App / web 工具通道）→ `s=true` + 极简 body（dex 还原写法）
+  → `s=true` + 带 `addScore` → `s=1` + 带 `addScore`。失败时日志会打印所用组合，
+  全部组合失败才计一次失败并跳过该任务剩余次数；被限流（`code=-98`）时等 9 秒重试同一组合（最多 2 次）。
+- 请求体：普通任务 `{"adId":...,"type":101}`（部分组合再附 `addScoreType:1`/`addScore`）；
+  每日签到 `{"adId":...,"weekDay":1..7}`（北京时间的 ISO 星期，任何组合都不带分数）。
+  旧脚本携带的小写 `weekday` 会被服务端视为无效请求。
 - 每日签到判重：`daily.ltime` 同日、今日流水计数、`daily.week` 位图（bit0 = 周一）任一成立即视为已签到。

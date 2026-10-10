@@ -65,12 +65,15 @@ object IlifApi {
         }
     }
 
-    /** 积分上报：POST /api/v1/acc/score/score-send?s=1（官方 App 通道），网络异常返回 null。 */
-    suspend fun sendScore(token: String, sign: String, body: JsonObject): SendResult? {
+    /**
+     * 积分上报：POST /api/v1/acc/score/score-send?sign=<md5>&s=<s>，网络异常返回 null。
+     * s 由调用方按参数组合给出（官方 App 通道 "1" / dex 还原的 "true"）。
+     */
+    suspend fun sendScore(token: String, sign: String, s: String, body: JsonObject): SendResult? {
         val res = ApiClient.post(
             "/api/v1/acc/score/score-send",
             token,
-            params = listOf("sign" to sign, "s" to "1"),
+            params = listOf("sign" to sign, "s" to s),
             jsonBody = body.toString()
         ) ?: return null
         return res.use { resp ->

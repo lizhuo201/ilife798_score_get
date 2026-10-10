@@ -6,6 +6,7 @@ import com.isuncy.ilife798.core.Signer
 import com.isuncy.ilife798.core.TimeUtil
 import com.isuncy.ilife798.data.model.Account
 import com.isuncy.ilife798.data.model.MissionsResult
+import com.isuncy.ilife798.data.model.TaskPlan
 import com.isuncy.ilife798.data.remote.IlifApi
 import com.isuncy.ilife798.data.remote.Parsers
 import kotlinx.coroutines.delay
@@ -16,6 +17,9 @@ import kotlin.random.Random
  * sleeper 可注入，便于测试时把 sleep 换成 0。
  */
 class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms) }) {
+
+    /** 当前生效的 score-send 参数组合下标（首次成功后固定沿用，跨账号保持）。 */
+    private var variantIndex = 0
 
     data class AccountResult(
         val phone: String,
@@ -83,6 +87,7 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
         val queue = MissionLogic.buildTaskQueue(parsed, todayCounts, nowMs)
         onLog("当前积分 " + parsed.score + "（总 " + parsed.totalScore + "），待执行任务 " + queue.size + " 个")
         if (queue.isEmpty()) onLog("所有可用任务均已达上限，无需执行。")
+        else onLog("上报参数组合[" + MissionLogic.SEND_VARIANTS[variantIndex].label + "]")
 
         var successSends = 0
         var failedSends = 0
@@ -90,28 +95,8 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
         for (task in queue) {
             onLog("- 任务[" + task.name + "] 执行 " + task.runsNeeded + " 次（进度 " + task.progress + "）")
             for (runIndex in 1..task.runsNeeded) {
-                // 每次上报都取当前时间重新签名（服务端按 10 秒一桶校验）
-                val sendMs = System.currentTimeMillis()
-                val sign = Signer.signWithServerTime(
-                    task.refId, account.token, account.uid, sendMs, localTs, serverTs
-                )
-                val body = MissionLogic.buildSendBody(task, sendMs)
-                val result = IlifApi.sendScore(account.token, sign, body)
-
-                val ok: Boolean
-                if (result == null) {
-                    failedSends += 1
-                    onLog("  x 第 " + runIndex + " 次上报网络异常")
-                    ok = false
-                } else if (result.ok) {
-                    successSends += 1
-                    onLog("  v 第 " + runIndex + " 次上报成功（+" + task.score + " 分）")
-                    ok = true
-                } else {
-                    failedSends += 1
-                    onLog("  x 第 " + runIndex + " 次上报失败 code=" + result.code + " msg=" + result.msg)
-                    ok = false
-                }
+                val ok = sendOnce(task, account, localTs, serverTs, runIndex, onLog)
+                if (ok) successSends += 1 else failedSends += 1
 
                 // 与 Python 一致：每次上报后（含失败那次）都随机暂停，失败则 break 剩余次数
                 sleeper(randomRunDelay())
@@ -125,6 +110,62 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
             ?: beforeScore
         onLog("最终积分 " + afterScore)
         return AccountResult(account.phone, successSends, failedSends, beforeScore, afterScore)
+    }
+
+    /**
+     * 上报一次（含参数组合探测）。成功返回 true 并记住该组合；失败按 MissionLogic.SEND_VARIANTS
+     * 顺序换用下一组重试，被限流（code=-98）则等一会儿重试同一组合。
+     * 网络异常不换组合，直接算失败。
+     */
+    private suspend fun sendOnce(
+        task: TaskPlan,
+        account: Account,
+        localTs: Long,
+        serverTs: Long,
+        runIndex: Int,
+        onLog: (String) -> Unit
+    ): Boolean {
+        var probe = variantIndex
+        var rateLimitRetries = 0
+        while (true) {
+            val variant = MissionLogic.SEND_VARIANTS[probe]
+            // 每次请求都重新取当前时间签名（服务端按 10 秒一桶校验）
+            val sendMs = System.currentTimeMillis()
+            val sign = Signer.signWithServerTime(
+                task.refId, account.token, account.uid, sendMs, localTs, serverTs
+            )
+            val body = MissionLogic.buildSendBody(task, sendMs, variant)
+            val result = IlifApi.sendScore(account.token, sign, variant.s, body)
+
+            if (result == null) {
+                onLog("  x 第 " + runIndex + " 次上报网络异常")
+                return false
+            }
+            if (result.ok) {
+                if (probe != variantIndex) {
+                    variantIndex = probe
+                    onLog("  · 参数组合[" + variant.label + "]可用，后续沿用")
+                }
+                onLog("  v 第 " + runIndex + " 次上报成功（+" + task.score + " 分）")
+                return true
+            }
+            if (result.code == Constants.RATE_LIMIT_CODE && rateLimitRetries < Constants.MAX_RATE_LIMIT_RETRY) {
+                rateLimitRetries += 1
+                onLog("  ! 第 " + runIndex + " 次被限流（code=" + result.code + "），" +
+                    Constants.RATE_LIMIT_DELAY_MS / 1000 + "s 后重试")
+                sleeper(Constants.RATE_LIMIT_DELAY_MS)
+                continue
+            }
+            onLog("  x 第 " + runIndex + " 次上报失败 code=" + result.code + " msg=" + result.msg +
+                "（参数[" + variant.label + "]）")
+            if (probe == MissionLogic.SEND_VARIANTS.lastIndex) {
+                onLog("  · 全部参数组合均失败，跳过该任务剩余次数")
+                return false
+            }
+            probe += 1
+            sleeper(Constants.PROBE_DELAY_MS)
+            onLog("  · 换用参数组合[" + MissionLogic.SEND_VARIANTS[probe].label + "]重试")
+        }
     }
 
     private fun randomRunDelay(): Long =

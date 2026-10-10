@@ -80,17 +80,38 @@ object MissionLogic {
     }
 
     /**
-     * 构造 score-send 请求体（对齐 3.1.7 官方 App 的 native 逻辑）：
-     * - 普通任务：{"adId": ..., "type": 101}
-     * - 每日签到：{"adId": ..., "weekDay": 1..7}（北京时间 ISO 星期，注意是大写 D）
-     * 旧版脚本附带的 addScore/addScoreType/weekday 会被服务端视为无效请求。
+     * score-send 的参数组合。服务端 2026-10 起改用服务端时间签名后，各第三方还原实现分成两派：
+     * 官方 App（dex 还原）发 s=true + 极简 body，web 工具发 s=1 + 带 addScore 的 body。
+     * 执行器按 [SEND_VARIANTS] 顺序探测，第一组成功后固定沿用。
      */
-    fun buildSendBody(task: TaskPlan, nowMs: Long): JsonObject = buildJsonObject {
+    data class SendVariant(val s: String, val includeScore: Boolean) {
+        val label: String get() = "s=" + s + (if (includeScore) " 带addScore" else " 极简body")
+    }
+
+    /** 探测顺序：官方 App 通道 → dex 写法 → 兜底 → web 版请求体。 */
+    val SEND_VARIANTS = listOf(
+        SendVariant("1", false),
+        SendVariant("true", false),
+        SendVariant("true", true),
+        SendVariant("1", true)
+    )
+
+    /**
+     * 构造 score-send 请求体：
+     * - 普通任务：{"adId": ..., "type": 101}，[SendVariant.includeScore] 为真时再附 addScoreType/addScore
+     * - 每日签到：{"adId": ..., "weekDay": 1..7}（北京时间 ISO 星期，注意是大写 D），不带分数
+     * 旧版脚本附带的小写 weekday 会被服务端视为无效请求，任何组合都不再发送。
+     */
+    fun buildSendBody(task: TaskPlan, nowMs: Long, variant: SendVariant): JsonObject = buildJsonObject {
         put("adId", task.refId)
         if (task.isCheckIn) {
             put("weekDay", TimeUtil.isoWeekdayInBeijing(nowMs))
         } else {
             put("type", 101)
+            if (variant.includeScore) {
+                put("addScoreType", 1)
+                put("addScore", task.score)
+            }
         }
     }
 }

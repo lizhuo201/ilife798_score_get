@@ -22,6 +22,12 @@ object Constants {
     const val DEFAULT_CHECKIN_SCORE = 5
     const val DEFAULT_CHECKIN_AD_ID = "DAILY_CHECK_IN"
 
+    // score-send 参数组合探测：失败时换用其它组合，被限流则稍后重试同一组合
+    const val PROBE_DELAY_MS = 2_000L
+    const val RATE_LIMIT_CODE = "-98"
+    const val RATE_LIMIT_DELAY_MS = 9_000L
+    const val MAX_RATE_LIMIT_RETRY = 2
+
     const val TASK_TYPE_CHECKIN = 1
     const val TASK_TYPE_NORMAL = 2
     const val TASK_TYPE_AD = 4
