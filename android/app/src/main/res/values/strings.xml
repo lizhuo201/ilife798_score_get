@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">798积分助手</string>
+    <string name="channel_score_exec">积分任务执行</string>
+    <string name="notification_running">正在执行积分任务，点击查看日志</string>
+    <string name="notification_stop">停止</string>
+</resources>
