@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import android.net.Uri
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -30,6 +31,12 @@ private const val ROUTE_HOME = "home"
 private const val ROUTE_RUN = "run"
 private const val ROUTE_HISTORY = "history"
 const val ROUTE_LOGIN = "login?phone={phone}"
+
+/** 新增账号：不带手机号，手机号输入框可编辑 */
+const val ROUTE_LOGIN_NEW = "login?phone="
+
+/** 重新登录：预填手机号（仍可编辑） */
+fun loginRoute(phone: String): String = "login?phone=" + Uri.encode(phone)
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 

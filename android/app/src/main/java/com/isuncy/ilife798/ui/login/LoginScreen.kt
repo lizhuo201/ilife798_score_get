@@ -70,7 +70,6 @@ fun LoginScreen(
                 value = state.phone,
                 onValueChange = { vm.setPhone(it) },
                 label = { Text("手机号") },
-                enabled = initialPhone.isEmpty(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth()
             )

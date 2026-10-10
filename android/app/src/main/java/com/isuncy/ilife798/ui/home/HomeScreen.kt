@@ -35,7 +35,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.isuncy.ilife798.execution.ExecutionState
 import com.isuncy.ilife798.service.ScoreService
-import com.isuncy.ilife798.ui.nav.ROUTE_LOGIN
+import com.isuncy.ilife798.ui.nav.ROUTE_LOGIN_NEW
+import com.isuncy.ilife798.ui.nav.loginRoute
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +82,7 @@ fun HomeScreen(navController: NavController, vm: HomeViewModel = viewModel()) {
             Spacer(Modifier.height(12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { navController.navigate(ROUTE_LOGIN) }) { Text("添加账号") }
+                Button(onClick = { navController.navigate(ROUTE_LOGIN_NEW) }) { Text("添加账号") }
                 OutlinedButton(onClick = {
                     importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
                 }) { Text("导入凭证") }
@@ -98,7 +99,7 @@ fun HomeScreen(navController: NavController, vm: HomeViewModel = viewModel()) {
                 items(accounts, key = { it.account.phone }) { item ->
                     AccountCard(
                         item = item,
-                        onRelogin = { navController.navigate("login?phone=" + item.account.phone) },
+                        onRelogin = { navController.navigate(loginRoute(item.account.phone)) },
                         onRemove = { vm.remove(item.account.phone) }
                     )
                 }
