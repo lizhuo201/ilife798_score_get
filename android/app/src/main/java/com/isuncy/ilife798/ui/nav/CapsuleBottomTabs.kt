@@ -116,7 +116,7 @@ fun CapsuleBottomTabs(
         TabStrip(
             tabs = tabs,
             selectedIndex = selectedIndex,
-            onSelect = {},
+            onSelect = null,
             showSelection = true,
             modifier = Modifier
                 .alpha(0f)
@@ -154,7 +154,7 @@ fun CapsuleBottomTabs(
 private fun TabStrip(
     tabs: List<NavTab>,
     selectedIndex: Int,
-    onSelect: (Int) -> Unit,
+    onSelect: ((Int) -> Unit)?,
     showSelection: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -166,16 +166,20 @@ private fun TabStrip(
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             }
+            val itemModifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable(
+                modifier = if (onSelect != null) {
+                    itemModifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         role = Role.Tab,
                         onClick = { onSelect(index) }
-                    ),
+                    )
+                } else {
+                    itemModifier
+                },
                 verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
