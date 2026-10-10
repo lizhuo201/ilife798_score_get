@@ -68,7 +68,7 @@ fun HistoryScreen(navController: NavController, vm: HistoryViewModel = viewModel
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 112.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(records) { record ->

@@ -3,7 +3,7 @@
 `auto_score.py` 的原生 Android 移植：Kotlin + Jetpack Compose（MVVM + Repository），网络层 OkHttp + 协程，JSON 用 kotlinx.serialization。
 
 - 包名：`com.isuncy.ilife798`，应用名：798积分助手
-- minSdk 24 / targetSdk 35 / compileSdk 35，JDK 17，AGP 8.7.3，Gradle 8.10.2（wrapper 已附带）
+- minSdk 24 / targetSdk 35 / compileSdk 36，JDK 17，AGP 8.12.3，Gradle 8.13（wrapper 已附带），Kotlin 2.2.21，Compose BOM 2025.10.01
 
 ## 功能
 
@@ -13,6 +13,8 @@
 - SAF 导入：直接读取 Python 版 `ilife_accounts.json`（格式互认，`[{"phone","token","uid"}] / [{"un","token","uid"}]`）
 - 实时日志 + 历史记录（`filesDir/history.json`）
 - 执行期间 ForegroundService（dataSync）保活本次执行，可锁屏/切后台
+- 液态玻璃胶囊底部导航（io.github.kyant0:backdrop 1.0.0，即 AndroidLiquidGlass；API 31+ 模糊、API 33+ 折射，低版本优雅降级）
+- 首次启动免责声明：同意后进入，不同意自动退出（通知权限申请也移到同意之后）
 
 ## 构建
 

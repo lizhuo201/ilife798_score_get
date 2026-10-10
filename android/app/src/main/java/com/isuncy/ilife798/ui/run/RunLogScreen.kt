@@ -1,6 +1,7 @@
 package com.isuncy.ilife798.ui.run
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -64,7 +65,7 @@ fun RunLogScreen(navController: NavController) {
                     }
                 }
             }
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 112.dp)) {
                 itemsIndexed(state.logs) { index, line ->
                     Text(
                         line,
