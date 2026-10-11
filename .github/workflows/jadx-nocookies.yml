@@ -1,0 +1,45 @@
+name: jadx-nocookies
+on:
+  push:
+    branches: [decomp]
+  workflow_dispatch: {}
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: fetch apk + jadx
+        run: |
+          set -e
+          APK=$(curl -sSL https://api.github.com/repos/nocookies111/life-798/releases/latest | python3 -c "import sys,json;d=json.load(sys.stdin);print([a['browser_download_url'] for a in d['assets'] if a['name'].lower().endswith('.apk')][0])")
+          echo "apk: $APK"
+          curl -sSL -o app.apk "$APK"
+          ls -l app.apk
+          JADX=$(curl -sSL https://api.github.com/repos/skylot/jadx/releases/latest | python3 -c "import sys,json;d=json.load(sys.stdin);print([a['browser_download_url'] for a in d['assets'] if a['name'].endswith('.zip')][0])")
+          echo "jadx: $JADX"
+          curl -sSL -o jadx.zip "$JADX"
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: decompile
+        run: |
+          ./jadx/bin/jadx -d out --no-res app.apk || true
+          find out -name '*.java' | wc -l
+      - name: dump relevant code
+        run: |
+          echo "===== files mentioning score-send ====="
+          grep -rl "score-send" out/sources | head -20
+          for f in $(grep -rl "score-send" out/sources | head -6); do echo "########## $f"; cat "$f"; done
+          echo "===== files mentioning salt A ====="
+          grep -rl "AbCdEfGhIjKlMnOpQrStUvWxYz12345" out/sources | head -10
+          for f in $(grep -rl "AbCdEfGhIjKlMnOpQrStUvWxYz12345" out/sources | head -3); do echo "########## $f"; cat "$f"; done
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: nc544-jadx
+          path: out
+          if-no-files-found: warn
