@@ -3,6 +3,13 @@ package com.isuncy.ilife798.core
 /** 与 Python 版 auto_score.py 保持一致的协议常量与执行参数。 */
 object Constants {
     const val SALT = "aslkdvcniu34h9tgufh278wv2"
+
+    // nocookies111/life-798 v5.4.4 APK（classes.dex）内实际携带的两枚签名盐：
+    // 分支A（账户模式，AppType "1,1" + version "3.1.9"，s=1，服务器时间校正）
+    const val SALT_NC_A = "AbCdEfGhIjKlMnOpQrStUvWxYz12345"
+    // 分支B（设备模式，AppType "1,5" + version "2.0.178"，不带 s，本机时间）
+    const val SALT_NC_B = "K9xP2QnR5T8wY3fA7cE1gJ4mL6oU0sZ"
+
     const val BASE_URL = "https://i.ilife798.com"
     const val VERSION_CODE = "3.1.7"
     const val VERSION_NUM = "31007"

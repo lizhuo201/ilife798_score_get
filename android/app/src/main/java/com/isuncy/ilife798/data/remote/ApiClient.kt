@@ -24,10 +24,15 @@ object ApiClient {
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    fun headers(token: String): Headers = Headers.Builder()
-        .add("user-agent", Constants.USER_AGENT)
-        .add("VersionCode", Constants.VERSION_NUM)
-        .add("ApplicationType", "1,1")
+    fun headers(
+        token: String,
+        appType: String = "1,1",
+        versionCode: String = Constants.VERSION_NUM,
+        userAgent: String = Constants.USER_AGENT
+    ): Headers = Headers.Builder()
+        .add("user-agent", userAgent)
+        .add("VersionCode", versionCode)
+        .add("ApplicationType", appType)
         .add("Content-Type", "application/json; charset=utf-8")
         .add("Accept", "application/json")
         .apply { if (token.isNotEmpty()) add("Authorization", token) }
@@ -47,19 +52,22 @@ object ApiClient {
             }
         }
 
-    /** POST JSON，网络异常返回 null。调用方负责 use/close。 */
+    /** POST JSON，网络异常返回 null。调用方负责 use/close。请求头可按探测组合覆盖。 */
     suspend fun post(
         path: String,
         token: String,
         params: List<Pair<String, String>> = emptyList(),
-        jsonBody: String? = null
+        jsonBody: String? = null,
+        appType: String = "1,1",
+        versionCode: String = Constants.VERSION_NUM,
+        userAgent: String = Constants.USER_AGENT
     ): Response? = withContext(Dispatchers.IO) {
         try {
             val url = (Constants.BASE_URL + path).toHttpUrl().newBuilder()
                 .apply { params.forEach { (k, v) -> addQueryParameter(k, v) } }
                 .build()
             val body = (jsonBody ?: "").toRequestBody(JSON_MEDIA)
-            val request = Request.Builder().url(url).headers(headers(token)).post(body).build()
+            val request = Request.Builder().url(url).headers(headers(token, appType, versionCode, userAgent)).post(body).build()
             http.newCall(request).execute()
         } catch (e: Exception) {
             null

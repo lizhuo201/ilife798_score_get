@@ -109,4 +109,25 @@ class SignerTest {
         assertEquals(32, out.length)
         assertEquals(out, out.lowercase())
     }
+
+    @Test
+    fun nocookiesVectorsMatchReference() {
+        // nocookies111/life-798 v5.4.4 dex 还原公式（30 秒桶、n 打头）的固定向量，
+        // 由 Node md5 镜像实现核对生成（2026-10-11）
+        val token = "t0k3n123456789"
+        val uid = "9876543210123456"
+        val nowMs = 1760140000000L
+        val localTs = 1760139999000L
+        val serverTs = 1760140001500L
+        assertEquals("85cc4c13f1865ccd4769a5698b3165af",
+            Signer.sign(Signer.SignMode.N30_A_SKEW, "read_x", token, uid, nowMs, localTs, serverTs))
+        assertEquals("c58c1ef11b2270f497fdb6e4af797423",
+            Signer.sign(Signer.SignMode.N30_B_LOCAL, "read_x", token, uid, nowMs, localTs, serverTs))
+        assertEquals("a400795d50ba47af7fb86323a80bbcaa",
+            Signer.sign(Signer.SignMode.N30_A_SKEW_ADID, "read_x", token, uid, nowMs, localTs, serverTs))
+        assertEquals("c370b14e8fa9479774f8432cb1182c68",
+            Signer.sign(Signer.SignMode.V20_10S_SALT_A, "read_x", token, uid, nowMs, localTs, serverTs))
+        assertEquals("84a785fb9ac6015851134866c9678d5b",
+            Signer.sign(Signer.SignMode.V20_10S_SALT_B, "read_x", token, uid, nowMs, localTs, serverTs))
+    }
 }

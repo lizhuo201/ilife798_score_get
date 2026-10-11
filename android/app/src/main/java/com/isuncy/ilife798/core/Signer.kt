@@ -19,8 +19,37 @@ object Signer {
     /** 允许的服务端时间偏差上限，超过则视为 time 字段不可信。 */
     const val MAX_SKEW_MS: Long = 30L * 60 * 1000
 
-    /** 带服务器时间校正的签名（每次上报都应使用上报时刻的 nowMs）。 */
-    fun signWithServerTime(
+    /**
+     * 签名模式。2026-10-04 服务端改版后，旧公式（adId + v20(10s桶) + token8 + uid8 + SALT）
+     * 报「验签失败 code=-1」。按 nocookies111/life-798 v5.4.4 APK 的 classes.dex 反汇编，
+     * 现行公式为 30 秒时间桶、n 拼接在最前（raw = n + 子串8 + 子串8 + salt），盐随模式不同。
+     */
+    enum class SignMode {
+        /** 旧版：adId + v20(10s桶, 服务器时间校正) + token8 + uid8 + SALT */
+        V20_10S_OLD,
+
+        /** nocookies 分支A：n(30s桶, 服务器时间校正) + token8 + uid8 + SALT_NC_A */
+        N30_A_SKEW,
+
+        /** nocookies 分支B：n(30s桶, 本机时间) + token8 + uid8 + SALT_NC_B */
+        N30_B_LOCAL,
+
+        /** 旧版布局 + 新盐A：adId + n30(校正) + token8 + uid8 + SALT_NC_A */
+        N30_A_SKEW_ADID,
+
+        /** 旧版布局 + 新盐B：adId + n30(本机) + token8 + uid8 + SALT_NC_B */
+        N30_B_LOCAL_ADID,
+
+        /** 旧版布局 + 10s桶 + 新盐A（盐轮换但布局未变的可能） */
+        V20_10S_SALT_A,
+
+        /** 旧版布局 + 10s桶 + 新盐B */
+        V20_10S_SALT_B
+    }
+
+    /** 按 [mode] 计算签名（每次上报都应使用上报时刻的 nowMs）。 */
+    fun sign(
+        mode: SignMode,
         businessId: String,
         token: String,
         uid: String,
@@ -30,10 +59,50 @@ object Signer {
     ): String {
         val skew = serverTs - localTs
         val offset = if (serverTs > 0L && localTs > 0L && skew <= MAX_SKEW_MS && skew >= -MAX_SKEW_MS) skew else 0L
-        val v20 = 10L * Math.floorDiv(nowMs + offset, 10000L)
-        val plain = businessId + v20 + token.takeLast(8) + uid.takeLast(8) + Constants.SALT
+        val t8 = token.takeLast(8)
+        val u8 = uid.takeLast(8)
+        val plain = when (mode) {
+            SignMode.V20_10S_OLD -> {
+                val v20 = 10L * Math.floorDiv(nowMs + offset, 10000L)
+                businessId + v20 + t8 + u8 + Constants.SALT
+            }
+            SignMode.N30_A_SKEW -> {
+                val n = 30L * Math.floorDiv(nowMs + offset, 30000L)
+                "$n$t8$u8" + Constants.SALT_NC_A
+            }
+            SignMode.N30_B_LOCAL -> {
+                val n = 30L * Math.floorDiv(nowMs, 30000L)
+                "$n$t8$u8" + Constants.SALT_NC_B
+            }
+            SignMode.N30_A_SKEW_ADID -> {
+                val n = 30L * Math.floorDiv(nowMs + offset, 30000L)
+                businessId + n + t8 + u8 + Constants.SALT_NC_A
+            }
+            SignMode.N30_B_LOCAL_ADID -> {
+                val n = 30L * Math.floorDiv(nowMs, 30000L)
+                businessId + n + t8 + u8 + Constants.SALT_NC_B
+            }
+            SignMode.V20_10S_SALT_A -> {
+                val v20 = 10L * Math.floorDiv(nowMs + offset, 10000L)
+                businessId + v20 + t8 + u8 + Constants.SALT_NC_A
+            }
+            SignMode.V20_10S_SALT_B -> {
+                val v20 = 10L * Math.floorDiv(nowMs + offset, 10000L)
+                businessId + v20 + t8 + u8 + Constants.SALT_NC_B
+            }
+        }
         return md5(plain)
     }
+
+    /** 带服务器时间校正的签名（每次上报都应使用上报时刻的 nowMs）。 */
+    fun signWithServerTime(
+        businessId: String,
+        token: String,
+        uid: String,
+        nowMs: Long,
+        localTs: Long,
+        serverTs: Long
+    ): String = sign(SignMode.V20_10S_OLD, businessId, token, uid, nowMs, localTs, serverTs)
 
     /** 不做时间校正（等价于 localTs == serverTs），用于固定向量测试与老逻辑对照。 */
     fun sign(businessId: String, token: String, uid: String, nowMs: Long): String =

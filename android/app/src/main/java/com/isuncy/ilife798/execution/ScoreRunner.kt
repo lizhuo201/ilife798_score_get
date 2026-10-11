@@ -129,13 +129,17 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
         var rateLimitRetries = 0
         while (true) {
             val variant = MissionLogic.SEND_VARIANTS[probe]
-            // 每次请求都重新取当前时间签名（服务端按 10 秒一桶校验）
+            // 每次请求都重新取当前时间签名（nocookies 现行公式按 30 秒一桶校验）
             val sendMs = System.currentTimeMillis()
-            val sign = Signer.signWithServerTime(
+            val sign = Signer.sign(
+                variant.signMode,
                 task.refId, account.token, account.uid, sendMs, localTs, serverTs
             )
             val body = MissionLogic.buildSendBody(task, sendMs, variant)
-            val result = IlifApi.sendScore(account.token, sign, variant.s, body)
+            val result = IlifApi.sendScore(
+                account.token, sign, variant.s, body,
+                variant.appType, variant.versionCode, variant.userAgent
+            )
 
             if (result == null) {
                 onLog("  x 第 " + runIndex + " 次上报网络异常")
