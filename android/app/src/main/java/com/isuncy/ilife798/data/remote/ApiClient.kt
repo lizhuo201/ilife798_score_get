@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 /** OkHttp 单例与请求封装，请求头与 Python 版 get_headers 一致。 */
 object ApiClient {
 
-    private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+    private val JSON_MEDIA = "application/json".toMediaType()
 
     val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -33,8 +33,8 @@ object ApiClient {
         .add("user-agent", userAgent)
         .add("VersionCode", versionCode)
         .add("ApplicationType", appType)
-        .add("Content-Type", "application/json; charset=utf-8")
-        .add("Accept", "application/json")
+        .add("Content-Type", "application/json")
+        .add("Accept-Language", "zh-Hans-CN;q=1")
         .apply { if (token.isNotEmpty()) add("Authorization", token) }
         .build()
 
