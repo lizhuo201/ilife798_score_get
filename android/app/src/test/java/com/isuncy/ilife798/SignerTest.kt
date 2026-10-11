@@ -125,6 +125,8 @@ class SignerTest {
             Signer.sign(Signer.SignMode.N30_B_LOCAL, "read_x", token, uid, nowMs, localTs, serverTs))
         assertEquals("a400795d50ba47af7fb86323a80bbcaa",
             Signer.sign(Signer.SignMode.N30_A_SKEW_ADID, "read_x", token, uid, nowMs, localTs, serverTs))
+        assertEquals("825e1c6a2048dc576f344d1f6aa8e2e6",
+            Signer.sign(Signer.SignMode.N30_B_LOCAL_ADID, "read_x", token, uid, nowMs, localTs, serverTs))
         assertEquals("c370b14e8fa9479774f8432cb1182c68",
             Signer.sign(Signer.SignMode.V20_10S_SALT_A, "read_x", token, uid, nowMs, localTs, serverTs))
         assertEquals("84a785fb9ac6015851134866c9678d5b",
