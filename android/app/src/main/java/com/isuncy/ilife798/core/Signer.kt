@@ -28,16 +28,20 @@ object Signer {
         /** 旧版：adId + v20(10s桶, 服务器时间校正) + token8 + uid8 + SALT */
         V20_10S_OLD,
 
-        /** nocookies 分支A：n(30s桶, 服务器时间校正) + token8 + uid8 + SALT_NC_A */
+        /** nocookies 分支A（占位式，未带 adId）：n(30s桶, 服务器时间校正) + token8 + uid8 + SALT_NC_A */
         N30_A_SKEW,
 
         /** nocookies 分支B：n(30s桶, 本机时间) + token8 + uid8 + SALT_NC_B */
         N30_B_LOCAL,
 
-        /** 旧版布局 + 新盐A：adId + n30(校正) + token8 + uid8 + SALT_NC_A */
+        /**
+         * ★现行公式（nocookies v5.4.4 dex 分支A 原样，jadx 反编译确认）：
+         * adId + n30(服务器时间校正) + token8 + uid8 + SALT_NC_A，配对 URL 追加 &s=1、
+         * 请求头 ApplicationType=1,1 + VersionCode=3.1.9
+         */
         N30_A_SKEW_ADID,
 
-        /** 旧版布局 + 新盐B：adId + n30(本机) + token8 + uid8 + SALT_NC_B */
+            /** 分支B 原样：adId + n30(本机时间) + token8 + uid8 + SALT_NC_B，URL 不带 s，1,5 / 2.0.178 */
         N30_B_LOCAL_ADID,
 
         /** 旧版布局 + 10s桶 + 新盐A（盐轮换但布局未变的可能） */
