@@ -3,16 +3,15 @@ package com.isuncy.ilife798.core
 import java.security.MessageDigest
 
 /**
- * 签名算法复刻官方 App 3.1.7（服务端 2026-10 起改用服务器时间签名）：
+ * 签名算法复刻 nocookies111/life-798 v5.4.4 官方 App（服务端 2026-10-04 起改用服务器时间签名）：
  *
- *   v20  = 10 * ((serverTs - localTs + nowMs) / 10000)
- *   sign = md5(businessId + v20 + token[-8:] + uid[-8:] + SALT)
+ *   raw  = adId + ((nowMs + skew) / 30000) * 30 + token[-8:] + uid[-8:] + SALT
+ *   sign = md5(raw)
  *
- * localTs 为请求任务列表（mission-lst）前的本机毫秒时间，serverTs 为该响应体顶层 time 字段
- * （毫秒），两者之差即本机相对服务器的时间偏差。旧版脚本直接用本机时间（等价于
- * localTs == serverTs），升级后会被服务端判为「验签失败 code=-1」。
- *
- * time 字段缺失（serverTs<=0）或偏差超过 [MAX_SKEW_MS] 时不做校正，退回旧行为。
+ * skew = 服务器时间 - 本机时间：localTs 为请求任务列表（mission-lst）前的本机毫秒时间，
+ * serverTs 为该响应体顶层 time 字段（毫秒）。官方 App 用 "1,1"/"3.1.9" 响应头 Date 计算并缓存
+ * 同一个偏差，两者等价。缺失（serverTs<=0）或偏差超过 [MAX_SKEW_MS] 时不做校正，退回本机时间。
+ * 历史旧公式为 10 秒时间桶 + 旧盐（见 [SignMode.V20_10S_OLD]），现仅作回退。
  */
 object Signer {
 
@@ -20,18 +19,20 @@ object Signer {
     const val MAX_SKEW_MS: Long = 30L * 60 * 1000
 
     /**
-     * 签名模式。2026-10-04 服务端改版后，旧公式（adId + v20(10s桶) + token8 + uid8 + SALT）
-     * 报「验签失败 code=-1」。按 nocookies111/life-798 v5.4.4 APK 的 classes.dex 反汇编，
-     * 现行公式为 30 秒时间桶、n 拼接在最前（raw = n + 子串8 + 子串8 + salt），盐随模式不同。
+     * 签名模式。2026-10-04 服务端改版后，旧公式（adId + v20(10s桶) + token8 + uid8 + 旧盐）报
+     * 「验签失败 code=-1」。按 nocookies111/life-798 v5.4.4 classes.dex 的 jadx 反编译
+     * （od3.java:189-194 的 K(str=token, str2=uid, str3=adId)；调用方 dw0.java:37-43 里
+     * body 的 adId 就是 str2，缺失的 uid 由 od3.o(token) 取 view-info 的 data.id 补上），
+     * 现行公式仍是 adId 打头的 30 秒时间桶，只是换了盐：raw = adId + n30 + token8 + uid8 + salt。
      */
     enum class SignMode {
         /** 旧版：adId + v20(10s桶, 服务器时间校正) + token8 + uid8 + SALT */
         V20_10S_OLD,
 
-        /** nocookies 分支A（占位式，未带 adId）：n(30s桶, 服务器时间校正) + token8 + uid8 + SALT_NC_A */
+        /** 占位变体（漏掉 adId，v1.0.5/1.0.6 误用此式）：n(30s桶, 服务器时间校正) + token8 + uid8 + SALT_NC_A */
         N30_A_SKEW,
 
-        /** nocookies 分支B：n(30s桶, 本机时间) + token8 + uid8 + SALT_NC_B */
+        /** 占位变体（漏掉 adId）：n(30s桶, 本机时间) + token8 + uid8 + SALT_NC_B */
         N30_B_LOCAL,
 
         /**
