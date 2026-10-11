@@ -1,6 +1,8 @@
 package com.isuncy.ilife798
 
+import com.isuncy.ilife798.core.Constants
 import com.isuncy.ilife798.core.MissionLogic
+import com.isuncy.ilife798.core.Signer
 import com.isuncy.ilife798.core.TimeUtil
 import com.isuncy.ilife798.data.model.MissionItem
 import com.isuncy.ilife798.data.model.MissionsResult
@@ -254,7 +256,7 @@ class MissionLogicTest {
     @Test
     fun missionBodyCarriesScoreForWebVariant() {
         val task = plan(refId = "read_x", score = 12)
-        val body = MissionLogic.buildSendBody(task, nowMs, MissionLogic.SendVariant("1", true))
+        val body = MissionLogic.buildSendBody(task, nowMs, MissionLogic.SendVariant("1", true, Signer.SignMode.V20_10S_OLD, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT))
         assertEquals("read_x", (body["adId"] as JsonPrimitive).content)
         assertEquals("101", (body["type"] as JsonPrimitive).content)
         assertEquals("1", (body["addScoreType"] as JsonPrimitive).content)
@@ -278,10 +280,10 @@ class MissionLogicTest {
 
     @Test
     fun sendVariantsCoverBothFlagAndBodyStyles() {
-        assertEquals(4, MissionLogic.SEND_VARIANTS.size)
+        assertEquals(13, MissionLogic.SEND_VARIANTS.size)
         assertTrue(MissionLogic.SEND_VARIANTS.any { it.s == "1" && !it.includeScore })
         assertTrue(MissionLogic.SEND_VARIANTS.any { it.s == "true" && !it.includeScore })
         assertTrue(MissionLogic.SEND_VARIANTS.any { it.includeScore })
-        assertEquals("s=1 极简body", MissionLogic.SEND_VARIANTS[0].label)
+        assertEquals("N30_A_SKEW s=1 极简body AppType=1,1", MissionLogic.SEND_VARIANTS[0].label)
     }
 }
