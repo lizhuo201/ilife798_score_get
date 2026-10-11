@@ -99,31 +99,21 @@ object MissionLogic {
     }
 
     /**
-     * 探测顺序：nocookies111/life-798 v5.4.4 dex 还原的现行公式（30 秒桶、n 打头、双盐）→
-     * 交叉组合 → 旧版回退。s="" 表示不带 s 参数（nocookies 分支B 的实际写法）。
-     * 执行器按顺序探测，第一组成功后固定沿用。
+     * 上报参数组合（按顺序探测，第一组成功后固定沿用）。
+     * 第 1 组即 nocookies111/life-798 v5.4.4 classes.dex 分支A 的逐字还原：
+     *   raw = adId + ((now + skew)/30000)*30 + token[-8:] + uid[-8:] + "AbCdEfGhIjKlMnOpQrStUvWxYz12345"
+     *   URL = .../score-send?sign=<md5>&s=1，请求头 ApplicationType=1,1 + VersionCode=3.1.9
+     *   UA = Android_ilife798_3.1.9，body = {"adId":..,"type":101}（官方渠道任务另带 addScore/addScoreType=4）
+     * 之所以先前失败：v1.0.5/1.0.6 少了 raw 最前面的 adId（因此先发的那一组必然验签失败，
+     * 而验签失败次数会触发服务端 -98 临时限流，把后面的正确组合全部挡住）。
      */
     val SEND_VARIANTS = listOf(
-        // 分支A 原样：服务器时间校正 + SALT_NC_A + s=1 + AppType 1,1 + 3.1.9
-        SendVariant("1", false, Signer.SignMode.N30_A_SKEW, "1,1", "31009", "Android_ilife798_3.1.9"),
-        // 分支B 原样：本机时间 + SALT_NC_B + 不带 s + AppType 1,5 + 2.0.178
-        SendVariant("", false, Signer.SignMode.N30_B_LOCAL, "1,5", "20178", "WaterWidget/2.0.178 (Android)"),
-        // 分支B 加 s=1 的写法（覆盖 dex 中 Lt51->T 未明确的情况）
-        SendVariant("1", false, Signer.SignMode.N30_B_LOCAL, "1,5", "20178", "WaterWidget/2.0.178 (Android)"),
-        // 新盐 × adId 打头布局
-        SendVariant("1", false, Signer.SignMode.N30_A_SKEW_ADID, "1,1", "31009", "Android_ilife798_3.1.9"),
-        SendVariant("1", false, Signer.SignMode.N30_B_LOCAL_ADID, "1,5", "20178", "WaterWidget/2.0.178 (Android)"),
-        // 新公式 × 我们自己的请求头（身份不变，只换签名）
-        SendVariant("1", false, Signer.SignMode.N30_A_SKEW, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT),
-        SendVariant("1", false, Signer.SignMode.N30_B_LOCAL, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT),
-        // 旧布局 × 新盐
-        SendVariant("1", false, Signer.SignMode.V20_10S_SALT_A, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT),
-        SendVariant("1", false, Signer.SignMode.V20_10S_SALT_B, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT),
-        // 旧版回退
-        SendVariant("1", false, Signer.SignMode.V20_10S_OLD, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT),
-        SendVariant("true", false, Signer.SignMode.V20_10S_OLD, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT),
-        SendVariant("true", true, Signer.SignMode.V20_10S_OLD, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT),
-        SendVariant("1", true, Signer.SignMode.V20_10S_OLD, "1,1", Constants.VERSION_NUM, Constants.USER_AGENT)
+        // ★ 现行公式（分支A 原样）
+        SendVariant("1", false, Signer.SignMode.N30_A_SKEW_ADID, "1,1", Constants.NC_VERSION_A, Constants.NC_UA_A),
+        // 备用1：分支B 原样（1,5 / 2.0.178，不带 s，本机时间，UA 为 WaterWidget/5.4.4）
+        SendVariant("", false, Signer.SignMode.N30_B_LOCAL_ADID, "1,5", Constants.NC_VERSION_B, Constants.NC_UA_B),
+        // 备用2：分支A + addScore/addScoreType=4（官方 App 渠道任务可能要求的 body）
+        SendVariant("1", true, Signer.SignMode.N30_A_SKEW_ADID, "1,1", Constants.NC_VERSION_A, Constants.NC_UA_A)
     )
 
     /**
