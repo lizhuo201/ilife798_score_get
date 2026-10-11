@@ -21,6 +21,9 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
     /** 当前生效的 score-send 参数组合下标（首次成功后固定沿用，跨账号保持）。 */
     private var variantIndex = 0
 
+    /** 被服务端限流（code=-98）时抛出，用于中止当前账号而不是继续消耗尝试次数。 */
+    private class RateLimitedException(msg: String) : Exception(msg)
+
     data class AccountResult(
         val phone: String,
         val successSends: Int,
@@ -92,16 +95,22 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
         var successSends = 0
         var failedSends = 0
 
-        for (task in queue) {
-            onLog("- 任务[" + task.name + "] 执行 " + task.runsNeeded + " 次（进度 " + task.progress + "）")
-            for (runIndex in 1..task.runsNeeded) {
-                val ok = sendOnce(task, account, localTs, serverTs, runIndex, onLog)
-                if (ok) successSends += 1 else failedSends += 1
+        try {
+            for (task in queue) {
+                onLog("- 任务[" + task.name + "] 执行 " + task.runsNeeded + " 次（进度 " + task.progress + "）")
+                for (runIndex in 1..task.runsNeeded) {
+                    val ok = sendOnce(task, account, localTs, serverTs, runIndex, onLog)
+                    if (ok) successSends += 1 else failedSends += 1
 
-                // 与 Python 一致：每次上报后（含失败那次）都随机暂停，失败则 break 剩余次数
-                sleeper(randomRunDelay())
-                if (!ok) break
+                    // 与 Python 一致：每次上报后（含失败那次）都随机暂停，失败则 break 剩余次数
+                    sleeper(randomRunDelay())
+                    if (!ok) break
+                }
             }
+        } catch (e: RateLimitedException) {
+            onLog("!! 服务器限流（code=" + Constants.RATE_LIMIT_CODE + "，msg=" + e.message + "）")
+            onLog("!! 已中止本账号：验签失败或被判定请求过密都会触发临时封锁，继续尝试只会延长封锁时间。")
+            onLog("!! 请等待 10 分钟以上再执行。")
         }
 
         // 4. 重取 mission-lst 记录最新积分
@@ -153,12 +162,15 @@ class ScoreRunner(private val sleeper: suspend (Long) -> Unit = { ms -> delay(ms
                 onLog("  v 第 " + runIndex + " 次上报成功（+" + task.score + " 分）")
                 return true
             }
-            if (result.code == Constants.RATE_LIMIT_CODE && rateLimitRetries < Constants.MAX_RATE_LIMIT_RETRY) {
-                rateLimitRetries += 1
-                onLog("  ! 第 " + runIndex + " 次被限流（code=" + result.code + "），" +
-                    Constants.RATE_LIMIT_DELAY_MS / 1000 + "s 后重试")
-                sleeper(Constants.RATE_LIMIT_DELAY_MS)
-                continue
+            if (result.code == Constants.RATE_LIMIT_CODE) {
+                if (rateLimitRetries < Constants.MAX_RATE_LIMIT_RETRY) {
+                    rateLimitRetries += 1
+                    onLog("  ! 第 " + runIndex + " 次被限流（code=" + result.code + "），" +
+                        Constants.RATE_LIMIT_DELAY_MS / 1000 + "s 后重试一次")
+                    sleeper(Constants.RATE_LIMIT_DELAY_MS)
+                    continue
+                }
+                throw RateLimitedException(result.msg)
             }
             onLog("  x 第 " + runIndex + " 次上报失败 code=" + result.code + " msg=" + result.msg +
                 "（参数[" + variant.label + "]）")
