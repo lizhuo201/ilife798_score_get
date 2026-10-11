@@ -15,6 +15,14 @@ object Constants {
     const val VERSION_NUM = "31007"
     const val USER_AGENT = "Android_ilife798_$VERSION_CODE"
 
+    // nocookies111/life-798 v5.4.4 官方 App 渠道（分支A）实际请求头：
+    // ApplicationType=1,1 + VersionCode=3.1.9（注意是版本字符串，不是 31009）
+    const val NC_VERSION_A = "3.1.9"
+    const val NC_UA_A = "Android_ilife798_3.1.9"
+    // 分支B（WaterWidget 设备渠道）实际请求头
+    const val NC_VERSION_B = "2.0.178"
+    const val NC_UA_B = "WaterWidget/5.4.4 (Android)"
+
     const val ACCOUNTS_FILE = "ilife_accounts.json"
     const val HISTORY_FILE = "history.json"
 
@@ -30,10 +38,11 @@ object Constants {
     const val DEFAULT_CHECKIN_AD_ID = "DAILY_CHECK_IN"
 
     // score-send 参数组合探测：失败时换用其它组合，被限流则稍后重试同一组合
-    const val PROBE_DELAY_MS = 2_000L
+    const val PROBE_DELAY_MS = 5_000L
     const val RATE_LIMIT_CODE = "-98"
-    const val RATE_LIMIT_DELAY_MS = 9_000L
-    const val MAX_RATE_LIMIT_RETRY = 2
+    // 被限流后等 60s 再试一次；仍被限流则中止该账号（避免继续消耗尝试次数）
+    const val RATE_LIMIT_DELAY_MS = 60_000L
+    const val MAX_RATE_LIMIT_RETRY = 1
 
     const val TASK_TYPE_CHECKIN = 1
     const val TASK_TYPE_NORMAL = 2
