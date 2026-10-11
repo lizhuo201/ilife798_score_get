@@ -279,11 +279,32 @@ class MissionLogicTest {
     }
 
     @Test
-    fun sendVariantsCoverBothFlagAndBodyStyles() {
-        assertEquals(13, MissionLogic.SEND_VARIANTS.size)
-        assertTrue(MissionLogic.SEND_VARIANTS.any { it.s == "1" && !it.includeScore })
-        assertTrue(MissionLogic.SEND_VARIANTS.any { it.s == "true" && !it.includeScore })
-        assertTrue(MissionLogic.SEND_VARIANTS.any { it.includeScore })
-        assertEquals("N30_A_SKEW s=1 极简body AppType=1,1", MissionLogic.SEND_VARIANTS[0].label)
+    fun sendVariantsMatchReversedOfficialFormula() {
+        // v1.0.7：只保留「现行公式（分支A 带 adId）」与其最小必要备用，避免先发错签名触发 -98 限流
+        assertEquals(3, MissionLogic.SEND_VARIANTS.size)
+
+        val primary = MissionLogic.SEND_VARIANTS[0]
+        assertEquals("1", primary.s)
+        assertFalse(primary.includeScore)
+        assertEquals(Signer.SignMode.N30_A_SKEW_ADID, primary.signMode)
+        assertEquals("1,1", primary.appType)
+        assertEquals(Constants.NC_VERSION_A, primary.versionCode)
+        assertEquals(Constants.NC_UA_A, primary.userAgent)
+        assertEquals("N30_A_SKEW_ADID s=1 极简body AppType=1,1", primary.label)
+
+        val deviceFallback = MissionLogic.SEND_VARIANTS[1]
+        assertEquals("", deviceFallback.s)
+        assertFalse(deviceFallback.includeScore)
+        assertEquals(Signer.SignMode.N30_B_LOCAL_ADID, deviceFallback.signMode)
+        assertEquals("1,5", deviceFallback.appType)
+        assertEquals(Constants.NC_VERSION_B, deviceFallback.versionCode)
+        assertEquals(Constants.NC_UA_B, deviceFallback.userAgent)
+
+        val withScore = MissionLogic.SEND_VARIANTS[2]
+        assertTrue(withScore.includeScore)
+        assertEquals(Signer.SignMode.N30_A_SKEW_ADID, withScore.signMode)
+
+        // 现行公式必须在第一位：第 1 组就应命中，不应再靠多组合探测
+        assertEquals(Signer.SignMode.N30_A_SKEW_ADID, MissionLogic.SEND_VARIANTS.first().signMode)
     }
 }
